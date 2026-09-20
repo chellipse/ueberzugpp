@@ -97,21 +97,21 @@ void Terminal::get_terminal_size()
         throw std::runtime_error("Unable to calculate terminal sizes");
     }
 
-    const double padding_horiz = guess_padding(cols, xpixel);
-    const double padding_vert = guess_padding(rows, ypixel);
+    //const float padding_horiz = guess_padding(cols, xpixel);
+    //const float padding_vert = guess_padding(rows, ypixel);
+    //padding_horizontal = std::max(padding_horiz, padding_vert);
+    //padding_vertical = padding_horizontal;
 
-    padding_horizontal = static_cast<uint16_t>(std::max(padding_horiz, padding_vert));
-    padding_vertical = padding_horizontal;
-    font_width = static_cast<uint16_t>(
-        std::floor(guess_font_size(cols, static_cast<float>(xpixel), static_cast<float>(padding_horizontal))));
-    font_height = static_cast<uint16_t>(
-        std::floor(guess_font_size(rows, static_cast<float>(ypixel), static_cast<float>(padding_vertical))));
+    padding_horizontal = guess_padding(cols, xpixel);
+    padding_vertical = guess_padding(rows, ypixel);
+    font_width = guess_font_size(cols, xpixel, padding_horizontal);
+    font_height = guess_font_size(rows, ypixel, padding_vertical);
 
     if (xpixel < fallback_xpixel && ypixel < fallback_ypixel) {
-        padding_horizontal = static_cast<uint16_t>((fallback_xpixel - xpixel) / 2);
-        padding_vertical = static_cast<uint16_t>((fallback_ypixel - ypixel) / 2);
-        font_width = static_cast<uint16_t>(xpixel / cols);
-        font_height = static_cast<uint16_t>(ypixel / rows);
+        padding_horizontal = static_cast<float>(fallback_xpixel - xpixel) / 2;
+        padding_vertical = static_cast<float>(fallback_ypixel - ypixel) / 2;
+        font_width = static_cast<float>(xpixel) / cols;
+        font_height = static_cast<float>(ypixel) / rows;
     }
 
     logger->debug("padding_horiz={} padding_vert={}", padding_horizontal, padding_vertical);
@@ -144,15 +144,15 @@ void Terminal::set_detected_output()
     }
 }
 
-auto Terminal::guess_padding(uint16_t chars, double pixels) -> double
+auto Terminal::guess_padding(uint16_t chars, float pixels) -> float
 {
-    const double font_size = std::floor(pixels / chars);
+    const float font_size = std::floor(pixels / chars);
     return (pixels - font_size * chars) / 2;
 }
 
 auto Terminal::guess_font_size(uint16_t chars, float pixels, float padding) -> float
 {
-    return (pixels - 2 * padding) / static_cast<float>(chars);
+    return (pixels - 2 * padding) / chars;
 }
 
 void Terminal::get_terminal_size_escape_code()

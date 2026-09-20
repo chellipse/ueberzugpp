@@ -33,10 +33,11 @@ class Terminal
     Terminal();
     ~Terminal();
 
-    uint16_t font_width;
-    uint16_t font_height;
-    uint16_t padding_horizontal;
-    uint16_t padding_vertical;
+    float font_width;
+    float font_height;
+    float padding_horizontal;
+    float padding_vertical;
+
     uint16_t rows;
     uint16_t cols;
     int pid = os::get_pid();
@@ -48,7 +49,7 @@ class Terminal
 
   private:
     auto get_terminal_size() -> void;
-    static auto guess_padding(uint16_t chars, double pixels) -> double;
+    static auto guess_padding(uint16_t chars, float pixels) -> float;
     static auto guess_font_size(uint16_t chars, float pixels, float padding) -> float;
     static auto read_raw_str(std::string_view esc) -> std::string;
 
