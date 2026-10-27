@@ -144,10 +144,12 @@ void WaylandCanvas::hide()
 
 WaylandCanvas::~WaylandCanvas()
 {
-    windows.clear();
+    // stop dispatching events before destroying the windows they're meant for
     if (event_handler.joinable()) {
         event_handler.join();
     }
+    windows.clear();
+    wl_display_flush(display);
 
 #ifdef ENABLE_OPENGL
     egl.reset();
@@ -194,7 +196,12 @@ void WaylandCanvas::handle_events()
     while (!Application::stop_flag) {
         // prepare to read wayland events
         while (wl_display_prepare_read(display) != 0) {
-            wl_display_dispatch_pending(display);
+            // on a broken connection the queue never drains, don't spin on it
+            if (wl_display_dispatch_pending(display) == -1) {
+                logger->error("Wayland connection error, stopping");
+                Application::stop_flag = true;
+                return;
+            }
         }
         wl_display_flush(display);
 
@@ -202,13 +209,17 @@ void WaylandCanvas::handle_events()
             constexpr int waitms = 100;
             in_event = os::wait_for_data_on_fd(wl_fd, waitms);
         } catch (const std::system_error &err) {
+            wl_display_cancel_read(display);
             Application::stop_flag = true;
             break;
         }
 
         if (in_event) {
-            wl_display_read_events(display);
-            wl_display_dispatch_pending(display);
+            if (wl_display_read_events(display) == -1 || wl_display_dispatch_pending(display) == -1) {
+                logger->error("Wayland connection error, stopping");
+                Application::stop_flag = true;
+                return;
+            }
         } else {
             wl_display_cancel_read(display);
         }
