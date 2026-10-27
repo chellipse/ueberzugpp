@@ -58,6 +58,7 @@ class WaylandShmWindow : public WaylandWindow
     struct wl_surface *surface = nullptr;
     struct xdg_surface *xdg_surface = nullptr;
     struct xdg_toplevel *xdg_toplevel = nullptr;
+    struct wp_viewport *viewport = nullptr;
     struct wl_callback *callback;
 
     std::unique_ptr<Image> image;
@@ -66,7 +67,7 @@ class WaylandShmWindow : public WaylandWindow
     struct XdgStructAgg *xdg_agg;
     void *this_ptr;
 
-    void move_window();
+    void move_window(const struct WaylandWindowGeometry &cur_window);
     void xdg_setup();
 
     void setup_listeners();

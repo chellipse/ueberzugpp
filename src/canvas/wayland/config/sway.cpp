@@ -39,6 +39,12 @@ SwaySocket::SwaySocket(const std::string_view endpoint)
 {
     logger->info("Using sway socket {}", endpoint);
     set_active_output_info();
+    try {
+        // prefer the terminal's output over the focused one
+        std::ignore = get_window_info();
+    } catch (const njson::exception &err) {
+        logger->debug("Could not find terminal window, using focused output");
+    }
 }
 
 struct __attribute__((packed)) ipc_header {
@@ -52,10 +58,17 @@ auto SwaySocket::get_window_info() -> struct WaylandWindowGeometry {
     const auto nodes = get_nodes();
     const auto window = get_active_window(nodes);
     const auto &rect = window.at("rect");
-    return {.width = rect.at("width"),
-            .height = rect.at("height"),
-            .x = rect.at("x").get<int>() - output_info.x,
-            .y = rect.at("y").get<int>() - output_info.y};
+    const int width = rect.at("width");
+    const int height = rect.at("height");
+    const int xcoord = rect.at("x");
+    const int ycoord = rect.at("y");
+    // the terminal can be on any output, each with its own scale
+    set_output_info_at(xcoord + (width / 2), ycoord + (height / 2));
+    return {.width = width,
+            .height = height,
+            .x = xcoord - output_info.x,
+            .y = ycoord - output_info.y,
+            .scale = output_info.scale};
 }
 
 auto SwaySocket::get_active_window(const std::vector<nlohmann::json>& nodes) -> nlohmann::json
@@ -100,20 +113,44 @@ auto SwaySocket::get_focused_output_name() -> std::string
     return output_info.name;
 };
 
+void SwaySocket::set_output_info(const nlohmann::json &output)
+{
+    const auto &rect = output.at("rect");
+    output_info = {
+        .x = rect.at("x"),
+        .y = rect.at("y"),
+        .scale = output.at("scale"),
+        .name = output.at("name"),
+    };
+}
+
 void SwaySocket::set_active_output_info()
 {
     const auto outputs = ipc_message(IPC_GET_OUTPUTS);
     for (const auto &node : outputs) {
         bool focused = node.at("focused");
         if (focused) {
-            const auto &rect = node.at("rect");
-            output_info = {
-                .x = rect.at("x"),
-                .y = rect.at("y"),
-                .scale = node.at("scale"),
-                .name = node.at("name"),
-            };
+            set_output_info(node);
             break;
+        }
+    }
+}
+
+void SwaySocket::set_output_info_at(int xcoord, int ycoord)
+{
+    const auto outputs = ipc_message(IPC_GET_OUTPUTS);
+    for (const auto &node : outputs) {
+        if (!node.value("active", false)) {
+            continue;
+        }
+        const auto &rect = node.at("rect");
+        const int out_x = rect.at("x");
+        const int out_y = rect.at("y");
+        const int out_w = rect.at("width");
+        const int out_h = rect.at("height");
+        if (xcoord >= out_x && xcoord < out_x + out_w && ycoord >= out_y && ycoord < out_y + out_h) {
+            set_output_info(node);
+            return;
         }
     }
 }
@@ -137,14 +174,11 @@ void SwaySocket::enable_floating(const std::string_view appid)
 
 void SwaySocket::move_window(const std::string_view appid, int xcoord, int ycoord)
 {
+    // coordinates are logical and relative to the terminal's output, move
+    // absolutely so the image follows it even if it spawned on another output
     const std::scoped_lock lock{mutex};
-    int res_x = xcoord;
-    int res_y = ycoord;
-    if (output_info.scale > 1.0F) {
-        res_x = res_x / 2;
-        res_y = res_y / 2;
-    }
-    const auto payload = fmt::format(R"([app_id="{}"] move position {} {})", appid, res_x, res_y);
+    const auto payload = fmt::format(R"([app_id="{}"] move absolute position {} {})", appid,
+                                     output_info.x + xcoord, output_info.y + ycoord);
     ipc_command(payload);
 }
 

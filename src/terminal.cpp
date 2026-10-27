@@ -319,8 +319,10 @@ void Terminal::get_fallback_wayland_terminal_sizes()
         return;
     }
     const auto window = config->get_window_info();
-    fallback_xpixel = static_cast<uint16_t>(window.width);
-    fallback_ypixel = static_cast<uint16_t>(window.height);
+    // window sizes are logical, convert them to the terminal's physical pixels
+    const float scale = window.scale > 0 ? window.scale : 1.0F;
+    fallback_xpixel = static_cast<uint16_t>(std::lround(window.width * scale));
+    fallback_ypixel = static_cast<uint16_t>(std::lround(window.height * scale));
 #endif
 }
 

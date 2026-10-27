@@ -68,6 +68,9 @@ void WaylandCanvas::registry_handle_global(void *data, wl_registry *registry, ui
         auto *output =
             static_cast<struct wl_output *>(wl_registry_bind(registry, name, &wl_output_interface, output_ver));
         wl_output_add_listener(output, &wl_output_listener, canvas);
+    } else if (interface_str == wp_viewporter_interface.name) {
+        canvas->viewporter =
+            static_cast<struct wp_viewporter *>(wl_registry_bind(registry, name, &wp_viewporter_interface, 1));
     }
 }
 
@@ -155,6 +158,9 @@ WaylandCanvas::~WaylandCanvas()
     egl.reset();
 #endif
 
+    if (viewporter != nullptr) {
+        wp_viewporter_destroy(viewporter);
+    }
     if (wl_shm != nullptr) {
         wl_shm_destroy(wl_shm);
     }
@@ -174,7 +180,7 @@ void WaylandCanvas::add_image(const std::string &identifier, std::unique_ptr<Ima
     if (egl_available) {
         try {
             window = std::make_shared<WaylandEglWindow>(compositor, xdg_base, egl.get(), std::move(new_image),
-                                                        config.get(), &xdg_agg);
+                                                        config.get(), &xdg_agg, viewporter);
         } catch (const std::runtime_error &err) {
             return;
         }

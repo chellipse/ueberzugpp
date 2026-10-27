@@ -18,6 +18,9 @@
 #include "dimensions.hpp"
 #include "util.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 #include <fmt/format.h>
 #include <thread>
 
@@ -32,7 +35,7 @@ constexpr struct wl_callback_listener frame_listener_egl = {.done = WaylandEglWi
 WaylandEglWindow::WaylandEglWindow(struct wl_compositor *compositor, struct xdg_wm_base *xdg_base,
                                    const EGLUtil<struct wl_display, struct wl_egl_window> *egl,
                                    std::unique_ptr<Image> new_image, WaylandConfig *new_config,
-                                   struct XdgStructAgg *xdg_agg)
+                                   struct XdgStructAgg *xdg_agg, struct wp_viewporter *viewporter)
     : compositor(compositor),
       xdg_base(xdg_base),
       surface(wl_compositor_create_surface(compositor)),
@@ -46,6 +49,9 @@ WaylandEglWindow::WaylandEglWindow(struct wl_compositor *compositor, struct xdg_
       xdg_agg(xdg_agg)
 {
     config->initial_setup(appid);
+    if (viewporter != nullptr) {
+        viewport = wp_viewporter_get_viewport(viewporter, surface);
+    }
     opengl_setup();
     xdg_setup();
 }
@@ -131,6 +137,10 @@ void WaylandEglWindow::delete_wayland_structs()
         wl_egl_window_destroy(egl_window);
         egl_window = nullptr;
     }
+    if (viewport != nullptr) {
+        wp_viewport_destroy(viewport);
+        viewport = nullptr;
+    }
     if (surface != nullptr) {
         wl_surface_destroy(surface);
         surface = nullptr;
@@ -139,10 +149,18 @@ void WaylandEglWindow::delete_wayland_structs()
 
 void WaylandEglWindow::draw()
 {
+    const auto cur_window = config->get_window_info();
+    if (viewport != nullptr && cur_window.scale > 0) {
+        // the image is sized in physical pixels, present it at its logical
+        // size so it maps 1:1 to the screen at any scale
+        const int logical_w = std::max(1, static_cast<int>(std::lround(image->width() / cur_window.scale)));
+        const int logical_h = std::max(1, static_cast<int>(std::lround(image->height() / cur_window.scale)));
+        wp_viewport_set_destination(viewport, logical_w, logical_h);
+    }
     load_framebuffer();
 
     wl_surface_commit(surface);
-    move_window();
+    move_window(cur_window);
 }
 
 void WaylandEglWindow::load_framebuffer()
@@ -159,12 +177,16 @@ void WaylandEglWindow::load_framebuffer()
     });
 }
 
-void WaylandEglWindow::move_window()
+void WaylandEglWindow::move_window(const struct WaylandWindowGeometry &cur_window)
 {
     const auto dims = image->dimensions();
-    const auto cur_window = config->get_window_info();
-    const int wayland_x = dims.xpixels() + dims.padding_horizontal;
-    const int wayland_y = dims.ypixels() + dims.padding_vertical;
+    int wayland_x = dims.xpixels() + dims.padding_horizontal;
+    int wayland_y = dims.ypixels() + dims.padding_vertical;
+    if (cur_window.scale > 0) {
+        // terminal cells are in physical pixels, the window position is logical
+        wayland_x = static_cast<int>(std::lround(wayland_x / cur_window.scale));
+        wayland_y = static_cast<int>(std::lround(wayland_y / cur_window.scale));
+    }
     const int xcoord = cur_window.x + wayland_x;
     const int ycoord = cur_window.y + wayland_y;
     config->move_window(appid, xcoord, ycoord);

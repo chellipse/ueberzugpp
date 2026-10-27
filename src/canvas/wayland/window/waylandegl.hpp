@@ -20,6 +20,7 @@
 #include "../config.hpp"
 #include "image.hpp"
 #include "util/egl.hpp"
+#include "wayland-viewporter-client-protocol.h"
 #include "wayland-xdg-shell-client-protocol.h"
 #include "waylandwindow.hpp"
 
@@ -34,7 +35,7 @@ class WaylandEglWindow : public WaylandWindow
   public:
     WaylandEglWindow(struct wl_compositor *compositor, struct xdg_wm_base *xdg_base,
                      const EGLUtil<struct wl_display, struct wl_egl_window> *egl, std::unique_ptr<Image> new_image,
-                     WaylandConfig *new_config, struct XdgStructAgg *xdg_agg);
+                     WaylandConfig *new_config, struct XdgStructAgg *xdg_agg, struct wp_viewporter *viewporter);
     ~WaylandEglWindow() override;
     static void xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial);
     static void wl_surface_frame_done(void *data, struct wl_callback *callback, uint32_t time);
@@ -53,6 +54,7 @@ class WaylandEglWindow : public WaylandWindow
     struct wl_surface *surface = nullptr;
     struct xdg_surface *xdg_surface = nullptr;
     struct xdg_toplevel *xdg_toplevel = nullptr;
+    struct wp_viewport *viewport = nullptr;
     struct wl_callback *callback;
 
     std::unique_ptr<Image> image;
@@ -75,7 +77,7 @@ class WaylandEglWindow : public WaylandWindow
     struct XdgStructAgg *xdg_agg;
     bool visible = false;
 
-    void move_window();
+    void move_window(const struct WaylandWindowGeometry &cur_window);
     void delete_wayland_structs();
     void delete_xdg_structs();
 

@@ -19,6 +19,9 @@
 #include "shm.hpp"
 #include "util.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 #include <fmt/format.h>
 
 constexpr int id_len = 10;
@@ -70,6 +73,9 @@ WaylandShmWindow::WaylandShmWindow(WaylandCanvas *canvas, std::unique_ptr<Image>
 {
     config->initial_setup(appid);
     xdg_setup();
+    if (canvas->viewporter != nullptr) {
+        viewport = wp_viewporter_get_viewport(canvas->viewporter, surface);
+    }
     output_scale = canvas->output_info.at(config->get_focused_output_name());
     shm = std::make_unique<WaylandShm>(image->width(), image->height(), output_scale, canvas->wl_shm);
 }
@@ -110,11 +116,22 @@ WaylandShmWindow::~WaylandShmWindow()
 
 void WaylandShmWindow::wl_draw(int32_t scale_factor)
 {
+    const auto cur_window = config->get_window_info();
     std::memcpy(shm->pool_data, image->data(), image->size());
     wl_surface_attach(surface, shm->buffer, 0, 0);
-    wl_surface_set_buffer_scale(surface, scale_factor);
+    if (viewport != nullptr && cur_window.scale > 0) {
+        // the image is sized in physical pixels, present it at its logical
+        // size so it maps 1:1 to the screen, even on fractional scales where
+        // the integer buffer scale can't
+        const int logical_w = std::max(1, static_cast<int>(std::lround(image->width() / cur_window.scale)));
+        const int logical_h = std::max(1, static_cast<int>(std::lround(image->height() / cur_window.scale)));
+        wl_surface_set_buffer_scale(surface, 1);
+        wp_viewport_set_destination(viewport, logical_w, logical_h);
+    } else {
+        wl_surface_set_buffer_scale(surface, scale_factor);
+    }
     wl_surface_commit(surface);
-    move_window();
+    move_window(cur_window);
 }
 
 void WaylandShmWindow::show()
@@ -155,18 +172,26 @@ void WaylandShmWindow::delete_xdg_structs()
 
 void WaylandShmWindow::delete_wayland_structs()
 {
+    if (viewport != nullptr) {
+        wp_viewport_destroy(viewport);
+        viewport = nullptr;
+    }
     if (surface != nullptr) {
         wl_surface_destroy(surface);
         surface = nullptr;
     }
 }
 
-void WaylandShmWindow::move_window()
+void WaylandShmWindow::move_window(const struct WaylandWindowGeometry &cur_window)
 {
     const auto dims = image->dimensions();
-    const auto cur_window = config->get_window_info();
-    const int wayland_x = dims.xpixels() + dims.padding_horizontal;
-    const int wayland_y = dims.ypixels() + dims.padding_vertical;
+    int wayland_x = dims.xpixels() + dims.padding_horizontal;
+    int wayland_y = dims.ypixels() + dims.padding_vertical;
+    if (cur_window.scale > 0) {
+        // terminal cells are in physical pixels, the window position is logical
+        wayland_x = static_cast<int>(std::lround(wayland_x / cur_window.scale));
+        wayland_y = static_cast<int>(std::lround(wayland_y / cur_window.scale));
+    }
     const int xcoord = cur_window.x + wayland_x;
     const int ycoord = cur_window.y + wayland_y;
     config->move_window(appid, xcoord, ycoord);

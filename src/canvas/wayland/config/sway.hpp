@@ -54,6 +54,8 @@ class SwaySocket : public WaylandConfig
     void ipc_command(std::string_view appid, std::string_view command) const;
     void ipc_command(std::string_view payload) const;
     void set_active_output_info();
+    void set_output_info_at(int xcoord, int ycoord);
+    void set_output_info(const nlohmann::json &output);
 
     [[nodiscard]] auto get_nodes() const -> std::vector<nlohmann::json>;
     [[nodiscard]] auto ipc_message(ipc_message_type type, std::string_view payload = "") const -> nlohmann::json;

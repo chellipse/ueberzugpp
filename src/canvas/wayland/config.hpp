@@ -26,6 +26,8 @@ struct WaylandWindowGeometry {
     int height;
     int x;
     int y;
+    // fractional scale of the output the window is on, 0 if unknown
+    float scale = 0.0F;
 };
 
 class WaylandConfig
