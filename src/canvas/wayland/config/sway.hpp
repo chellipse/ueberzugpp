@@ -20,6 +20,8 @@
 #include "../config.hpp"
 #include "util/socket.hpp"
 
+#include <mutex>
+
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -57,6 +59,9 @@ class SwaySocket : public WaylandConfig
     UnixSocket socket;
     std::shared_ptr<spdlog::logger> logger;
     struct SwayOutputInfo output_info;
+    // used from both the command and the wayland event threads, keeps ipc
+    // replies paired with their requests and the cached state consistent
+    mutable std::recursive_mutex mutex;
 };
 
 #endif

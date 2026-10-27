@@ -48,6 +48,7 @@ struct __attribute__((packed)) ipc_header {
 };
 
 auto SwaySocket::get_window_info() -> struct WaylandWindowGeometry {
+    const std::scoped_lock lock{mutex};
     const auto nodes = get_nodes();
     const auto window = get_active_window(nodes);
     const auto &rect = window.at("rect");
@@ -79,6 +80,7 @@ auto SwaySocket::get_active_window(const std::vector<nlohmann::json>& nodes) -> 
 
 auto SwaySocket::get_focused_output_name() -> std::string
 {
+    const std::scoped_lock lock{mutex};
     return output_info.name;
 };
 
@@ -119,6 +121,7 @@ void SwaySocket::enable_floating(const std::string_view appid)
 
 void SwaySocket::move_window(const std::string_view appid, int xcoord, int ycoord)
 {
+    const std::scoped_lock lock{mutex};
     int res_x = xcoord;
     int res_y = ycoord;
     if (output_info.scale > 1.0F) {
@@ -139,6 +142,7 @@ auto SwaySocket::ipc_message(ipc_message_type type, const std::string_view paylo
     if (!payload.empty()) {
         logger->debug("Running socket command {}", payload);
     }
+    const std::scoped_lock lock{mutex};
     socket.write(&header, ipc_header_size);
     socket.write(payload.data(), payload.size());
 
