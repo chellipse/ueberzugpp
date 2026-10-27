@@ -22,6 +22,7 @@
 #include <string_view>
 
 #include <spdlog/fwd.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 
 #include "flags.hpp"
@@ -32,6 +33,8 @@ class Terminal
   public:
     Terminal();
     ~Terminal();
+
+    void refresh_size();
 
     float font_width;
     float font_height;
@@ -48,7 +51,8 @@ class Terminal
     std::string detected_output;
 
   private:
-    auto get_terminal_size() -> void;
+    // probe: also query the terminal with escape codes, if enabled
+    auto get_terminal_size(bool probe = true) -> void;
     static auto guess_padding(uint16_t chars, float pixels) -> float;
     static auto guess_font_size(uint16_t chars, float pixels, float padding) -> float;
     static auto read_raw_str(std::string_view esc) -> std::string;
@@ -69,6 +73,7 @@ class Terminal
     void set_detected_output();
 
     int pty_fd;
+    struct winsize last_size {};
     int xpixel = 0;
     int ypixel = 0;
     uint16_t fallback_xpixel = 0;

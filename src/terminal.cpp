@@ -62,10 +62,32 @@ Terminal::~Terminal()
     }
 }
 
-void Terminal::get_terminal_size()
+void Terminal::refresh_size()
+{
+    // cell sizes change when the terminal is resized, zoomed or moved to an
+    // output with another scale
+    struct winsize size;
+    if (ioctl(pty_fd, TIOCGWINSZ, &size) == -1) {
+        return;
+    }
+    if (size.ws_col == last_size.ws_col && size.ws_row == last_size.ws_row &&
+        size.ws_xpixel == last_size.ws_xpixel && size.ws_ypixel == last_size.ws_ypixel) {
+        return;
+    }
+    // escape code queries would be answered into the program owning the
+    // terminal, keep the startup sizes if they're the only way to get them
+    if (flags->use_escape_codes && (size.ws_xpixel == 0 || size.ws_ypixel == 0)) {
+        return;
+    }
+    logger->debug("Terminal size changed, measuring again");
+    get_terminal_size(false);
+}
+
+void Terminal::get_terminal_size(bool probe)
 {
     struct winsize size;
     ioctl(pty_fd, TIOCGWINSZ, &size);
+    last_size = size;
     cols = size.ws_col;
     rows = size.ws_row;
     xpixel = size.ws_xpixel;
@@ -73,7 +95,7 @@ void Terminal::get_terminal_size()
     logger->debug("ioctl sizes: COLS={} ROWS={} XPIXEL={} YPIXEL={}", cols, rows, xpixel, ypixel);
 
     check_iterm2_support();
-    if (flags->use_escape_codes) {
+    if (flags->use_escape_codes && probe) {
         init_termios();
         if (xpixel == 0 || ypixel == 0) {
             get_terminal_size_escape_code();
