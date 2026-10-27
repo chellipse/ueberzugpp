@@ -78,6 +78,7 @@ class WaylandEglWindow : public WaylandWindow
     bool visible = false;
 
     void move_window(const struct WaylandWindowGeometry &cur_window);
+    [[nodiscard]] auto get_position(const struct WaylandWindowGeometry &cur_window) const -> std::pair<int, int>;
     void delete_wayland_structs();
     void delete_xdg_structs();
 

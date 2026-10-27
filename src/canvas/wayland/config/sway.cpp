@@ -172,6 +172,14 @@ void SwaySocket::enable_floating(const std::string_view appid)
     ipc_command(appid, "floating enable");
 }
 
+void SwaySocket::set_initial_position(const std::string_view appid, int xcoord, int ycoord)
+{
+    // for_window rules run as the window is mapped, before its first frame,
+    // otherwise it shows up centered until move_window catches up
+    const std::scoped_lock lock{mutex};
+    ipc_command(appid, fmt::format("move absolute position {} {}", output_info.x + xcoord, output_info.y + ycoord));
+}
+
 void SwaySocket::move_window(const std::string_view appid, int xcoord, int ycoord)
 {
     // coordinates are logical and relative to the terminal's output, move

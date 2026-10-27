@@ -42,6 +42,12 @@ class WaylandConfig
     virtual auto is_dummy() -> bool { return false; }
     virtual void initial_setup(std::string_view appid) = 0;
     virtual void move_window(std::string_view appid, int xcoord, int ycoord) = 0;
+    // place the window before it is first shown, so it doesn't flash wherever
+    // the compositor maps new windows
+    virtual void set_initial_position([[maybe_unused]] std::string_view appid, [[maybe_unused]] int xcoord,
+                                      [[maybe_unused]] int ycoord)
+    {
+    }
 };
 
 #endif

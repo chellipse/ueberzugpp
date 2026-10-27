@@ -68,6 +68,7 @@ class WaylandShmWindow : public WaylandWindow
     void *this_ptr;
 
     void move_window(const struct WaylandWindowGeometry &cur_window);
+    [[nodiscard]] auto get_position(const struct WaylandWindowGeometry &cur_window) const -> std::pair<int, int>;
     void xdg_setup();
 
     void setup_listeners();

@@ -49,6 +49,8 @@ WaylandEglWindow::WaylandEglWindow(struct wl_compositor *compositor, struct xdg_
       xdg_agg(xdg_agg)
 {
     config->initial_setup(appid);
+    const auto [xcoord, ycoord] = get_position(config->get_window_info());
+    config->set_initial_position(appid, xcoord, ycoord);
     if (viewporter != nullptr) {
         viewport = wp_viewporter_get_viewport(viewporter, surface);
     }
@@ -179,6 +181,12 @@ void WaylandEglWindow::load_framebuffer()
 
 void WaylandEglWindow::move_window(const struct WaylandWindowGeometry &cur_window)
 {
+    const auto [xcoord, ycoord] = get_position(cur_window);
+    config->move_window(appid, xcoord, ycoord);
+}
+
+auto WaylandEglWindow::get_position(const struct WaylandWindowGeometry &cur_window) const -> std::pair<int, int>
+{
     const auto dims = image->dimensions();
     int wayland_x = dims.xpixels() + dims.padding_horizontal;
     int wayland_y = dims.ypixels() + dims.padding_vertical;
@@ -187,9 +195,7 @@ void WaylandEglWindow::move_window(const struct WaylandWindowGeometry &cur_windo
         wayland_x = static_cast<int>(std::lround(wayland_x / cur_window.scale));
         wayland_y = static_cast<int>(std::lround(wayland_y / cur_window.scale));
     }
-    const int xcoord = cur_window.x + wayland_x;
-    const int ycoord = cur_window.y + wayland_y;
-    config->move_window(appid, xcoord, ycoord);
+    return {cur_window.x + wayland_x, cur_window.y + wayland_y};
 }
 
 void WaylandEglWindow::generate_frame()

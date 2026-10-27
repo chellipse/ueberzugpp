@@ -46,6 +46,7 @@ class SwaySocket : public WaylandConfig
     auto get_window_info() -> struct WaylandWindowGeometry override;
     void initial_setup(std::string_view appid) override;
     void move_window(std::string_view appid, int xcoord, int ycoord) override;
+    void set_initial_position(std::string_view appid, int xcoord, int ycoord) override;
     auto get_active_window(const std::vector<nlohmann::json> &nodes) -> nlohmann::json;
 
   private:
