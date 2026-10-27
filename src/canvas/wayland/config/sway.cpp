@@ -60,20 +60,36 @@ auto SwaySocket::get_window_info() -> struct WaylandWindowGeometry {
 
 auto SwaySocket::get_active_window(const std::vector<nlohmann::json>& nodes) -> nlohmann::json
 {
+    // once found, follow the terminal by its container id, the pid can't
+    // tell apart windows that share a process (e.g. alacritty msg create-window)
+    if (window_id.has_value()) {
+        const auto found = ranges::find_if(
+            nodes, [this](const njson &json) -> bool { return json.value("id", int64_t{-1}) == *window_id; });
+        if (found != nodes.end()) {
+            return *found;
+        }
+        window_id.reset();
+    }
+
     const auto pids = tmux::get_client_pids().value_or(std::vector<int>{Application::parent_pid});
 
     for (const auto pid : pids) {
         const auto tree = util::get_process_tree(pid);
-        const auto found = ranges::find_if(nodes, [&tree](const njson &json) -> bool {
-            try {
-                return ranges::find(tree, json.at("pid").get<int>()) != tree.end();
-            } catch (const njson::out_of_range &err) {
-                return false;
+        std::vector<njson> matches;
+        for (const auto &node : nodes) {
+            if (ranges::find(tree, node.value("pid", -1)) != tree.end()) {
+                matches.push_back(node);
             }
-        });
-        if (found != nodes.end()) {
-            return *found;
         }
+        if (matches.empty()) {
+            continue;
+        }
+        // with several windows per process, the one being used is focused
+        const auto focused =
+            ranges::find_if(matches, [](const njson &json) -> bool { return json.value("focused", false); });
+        const auto &window = focused != matches.end() ? *focused : matches.front();
+        window_id = window.at("id").get<int64_t>();
+        return window;
     }
     return nullptr;
 }

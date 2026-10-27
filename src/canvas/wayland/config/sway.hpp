@@ -20,7 +20,9 @@
 #include "../config.hpp"
 #include "util/socket.hpp"
 
+#include <cstdint>
 #include <mutex>
+#include <optional>
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -44,7 +46,7 @@ class SwaySocket : public WaylandConfig
     auto get_window_info() -> struct WaylandWindowGeometry override;
     void initial_setup(std::string_view appid) override;
     void move_window(std::string_view appid, int xcoord, int ycoord) override;
-    static auto get_active_window(const std::vector<nlohmann::json> &nodes) -> nlohmann::json;
+    auto get_active_window(const std::vector<nlohmann::json> &nodes) -> nlohmann::json;
 
   private:
     void disable_focus(std::string_view appid);
@@ -59,6 +61,7 @@ class SwaySocket : public WaylandConfig
     UnixSocket socket;
     std::shared_ptr<spdlog::logger> logger;
     struct SwayOutputInfo output_info;
+    std::optional<int64_t> window_id;
     // used from both the command and the wayland event threads, keeps ipc
     // replies paired with their requests and the cached state consistent
     mutable std::recursive_mutex mutex;
